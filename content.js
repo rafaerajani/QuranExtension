@@ -1,36 +1,121 @@
-// 1. Initialization / Page Load
-console.log("content.js loaded"); // Test that script is running
+// content.js - Quran Memorisation Tracker
 
-// 2. Define storage keys or structure
-// Example: store memorisation status by surah or juz IDs
-// let memorisationData = {}; 
+console.log("content.js loaded");
 
-// 3. Function to load saved progress from Chrome storage
-function loadProgress() {
-    // Use chrome.storage.local.get to fetch saved data
-    // Example:
-    // chrome.storage.local.get(['memorisationData'], (result) => { ... });
+// ----------------------------
+// Storage object
+// ----------------------------
+let memorisationData = {}; // Stores memorisation state
+
+// ----------------------------
+// Load saved data from Chrome storage
+// ----------------------------
+function loadProgress(callback) {
+    chrome.storage.local.get(['memorisationData'], (result) => {
+        memorisationData = result.memorisationData || {};
+        if (callback) callback();
+    });
 }
 
-// 4. Function to save progress when a checkbox is clicked
+// ----------------------------
+// Save updated data to Chrome storage
+// ----------------------------
 function saveProgress(key, value) {
-    // Update the memorisationData object and save with chrome.storage.local.set
+    memorisationData[key] = value;
+    chrome.storage.local.set({ memorisationData });
 }
 
-// 5. Function to create a checkbox next to a DOM element
-function createCheckbox(element, id) {
-    // Create <input type="checkbox">
-    // Set checkbox.checked based on memorisationData
-    // Add event listener for change → call saveProgress()
-    // Append the checkbox to the DOM element
+// ----------------------------
+// Create a checkbox and attach it to a DOM element
+// ----------------------------
+function createCheckbox(element, key) {
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.style.marginLeft = '8px';
+    checkbox.checked = memorisationData[key] || false;
+
+    // Save changes on toggle
+    checkbox.addEventListener('change', () => {
+        saveProgress(key, checkbox.checked);
+    });
+
+    // Append the checkbox to the element
+    element.appendChild(checkbox);
 }
 
-// 6. Function to initialize the UI
+// ----------------------------
+// Determine page type from URL
+// ----------------------------
+function getPageType() {
+    const path = window.location.pathname; // e.g., /2, /juz/1, /page/23
+    const search = window.location.search; // e.g., ?startingVerse=5
+
+    if (path.startsWith("/juz/")) return 'juz';
+    if (path.startsWith("/page/")) return 'page';
+    if (search.includes("startingVerse")) return 'verse';
+    return 'surah'; // Default fallback
+}
+
+// ----------------------------
+// Generate unique storage key based on page type
+// ----------------------------
+function generateKey(pageType) {
+    const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+
+    switch (pageType) {
+        case 'surah':
+            const surahNumber = path.split('/')[1];
+            return `surah_${surahNumber}`;
+        case 'juz':
+            const juzNumber = path.split('/')[2];
+            return `juz_${juzNumber}`;
+        case 'page':
+            const pageNumber = path.split('/')[2];
+            return `page_${pageNumber}`;
+        case 'verse':
+            const surah = path.split('/')[1];
+            const verse = searchParams.get("startingVerse");
+            return `verse_${surah}_${verse}`;
+        default:
+            return 'unknown';
+    }
+}
+
+// ----------------------------
+// Initialize checkboxes for the page
+// ----------------------------
 function initUI() {
-    // Select all surahs/juz/ayah elements on the page (document.querySelectorAll)
-    // Loop through them and call createCheckbox for each
+    const pageType = getPageType();
+    const key = generateKey(pageType);
+
+    // Select a suitable element to attach the checkbox
+    let targetElement;
+
+    switch (pageType) {
+        case 'surah':
+        case 'juz':
+        case 'page':
+            // Example: heading element for surah/juz/page
+            targetElement = document.querySelector('h1'); // may need adjustment based on Quran.com DOM
+            break;
+        case 'verse':
+            // For verse pages, add checkbox next to each verse element
+            const verseElements = document.querySelectorAll('[data-verse-id]');
+            verseElements.forEach((el) => {
+                const verseId = el.getAttribute('data-verse-id'); // unique verse id
+                const verseKey = `verse_${verseId}`;
+                createCheckbox(el, verseKey);
+            });
+            return; // exit because verse checkboxes handled separately
+    }
+
+    if (targetElement) {
+        createCheckbox(targetElement, key);
+    }
 }
 
-// 7. Run on page load
-loadProgress();
-initUI();
+// ----------------------------
+// Run
+// ----------------------------
+loadProgress(initUI);
