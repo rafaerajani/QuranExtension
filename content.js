@@ -85,35 +85,44 @@ function generateKey(pageType) {
 // ----------------------------
 // Initialize checkboxes for the page
 // ----------------------------
+// ...existing code...
+
 function initUI() {
-    const pageType = getPageType();
-    const key = generateKey(pageType);
+    // Only run on homepage
+    if (window.location.pathname !== "/") return;
 
-    // Select a suitable element to attach the checkbox
-    let targetElement;
+    // Select all Surah rows
+    const surahRows = document.querySelectorAll('.SurahPreviewRow_surahNumber__uuxf9');
+    surahRows.forEach((row) => {
+        const surahNumberSpan = row.querySelector('span');
+        if (!surahNumberSpan) return;
 
-    switch (pageType) {
-        case 'surah':
-        case 'juz':
-        case 'page':
-            // Example: heading element for surah/juz/page
-            targetElement = document.querySelector('h1'); // may need adjustment based on Quran.com DOM
-            break;
-        case 'verse':
-            // For verse pages, add checkbox next to each verse element
-            const verseElements = document.querySelectorAll('[data-verse-id]');
-            verseElements.forEach((el) => {
-                const verseId = el.getAttribute('data-verse-id'); // unique verse id
-                const verseKey = `verse_${verseId}`;
-                createCheckbox(el, verseKey);
-            });
-            return; // exit because verse checkboxes handled separately
-    }
+        const surahNumber = surahNumberSpan.innerText.trim();
+        const key = `surah_${surahNumber}`;
 
-    if (targetElement) {
-        createCheckbox(targetElement, key);
-    }
+        // Avoid adding multiple checkboxes
+        if (row.querySelector('input[type="checkbox"]')) return;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.style.marginLeft = '8px';
+        checkbox.checked = memorisationData[key] || false;
+
+        // Prevent navigation when clicking checkbox
+        checkbox.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        checkbox.addEventListener('change', () => {
+            saveProgress(key, checkbox.checked);
+        });
+
+        row.appendChild(checkbox);
+    });
 }
+
+// ...existing code...
+
 
 // ----------------------------
 // Run
