@@ -22,6 +22,11 @@ function createCheckbox(element, key) {
     checkbox.style.marginLeft = '8px';
     checkbox.checked = memorisationData[key] || false;
 
+    // Prevent navigation when clicking checkbox
+    checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
     // Save changes on toggle
     checkbox.addEventListener('change', () => {
         saveProgress(key, checkbox.checked);
@@ -31,8 +36,42 @@ function createCheckbox(element, key) {
     element.appendChild(checkbox);
 }
 
+function clearAllProgress() {
+    // Clear the storage
+    memorisationData = {};
+    chrome.storage.local.set({ memorisationData });
+
+    // Uncheck all checkboxes
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+function addClearButton() {
+    const tabsContainer = document.querySelector('.Tabs_container__AsP9A');
+    if (!tabsContainer || tabsContainer.querySelector('.clear-all-button')) return;
+
+    const clearButton = document.createElement('button');
+    clearButton.className = 'Button_base__52bgM Button_primary__YDSAz Button_small__pwmU9 Button_pill__a6C8J Button_compact__U3Ejr clear-all-button';
+    clearButton.style.marginLeft = 'auto'; // Keep the right positioning
+    clearButton.setAttribute('data-auto-flip-icon', 'true');
+    
+    // Create span for the content (like the original button)
+    const buttonContent = document.createElement('span');
+    buttonContent.className = 'Button_content__HbnrW';
+    buttonContent.textContent = 'Clear All';
+    clearButton.appendChild(buttonContent);
+
+    clearButton.addEventListener('click', clearAllProgress);
+    tabsContainer.appendChild(clearButton);
+}
+
 function initUI() {
     // Remove homepage-only restriction to work on all pages
+    
+    // Add the clear button
+    addClearButton();
     
     // Select all Surah rows by their number div
     const surahRows = document.querySelectorAll('.SurahPreviewRow_surahNumber__uuxf9');
@@ -51,21 +90,8 @@ function initUI() {
         // Avoid adding multiple checkboxes
         if (surahNameDiv.querySelector('input[type="checkbox"]')) return;
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.style.marginLeft = '8px';
-        checkbox.checked = memorisationData[key] || false;
-
-        // Prevent navigation when clicking checkbox
-        checkbox.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
-
-        checkbox.addEventListener('change', () => {
-            saveProgress(key, checkbox.checked);
-        });
-
-        surahNameDiv.appendChild(checkbox);
+        // Use the createCheckbox function instead of duplicating code
+        createCheckbox(surahNameDiv, key);
     });
 }
 
@@ -90,6 +116,9 @@ function observePageChanges() {
         subtree: true,      // Watch for changes in all descendants
         attributes: false    // Don't watch for attribute changes
     });
+    
+    // Make sure clear button is added after DOM changes
+    addClearButton();
 }
 
 // Initialize when the page loads
