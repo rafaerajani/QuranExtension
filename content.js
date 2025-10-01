@@ -2,14 +2,8 @@
 
 console.log("content.js loaded");
 
-// ----------------------------
-// Storage object
-// ----------------------------
 let memorisationData = {}; // Stores memorisation state
 
-// ----------------------------
-// Load saved data from Chrome storage
-// ----------------------------
 function loadProgress(callback) {
     chrome.storage.local.get(['memorisationData'], (result) => {
         memorisationData = result.memorisationData || {};
@@ -17,17 +11,11 @@ function loadProgress(callback) {
     });
 }
 
-// ----------------------------
-// Save updated data to Chrome storage
-// ----------------------------
 function saveProgress(key, value) {
     memorisationData[key] = value;
     chrome.storage.local.set({ memorisationData });
 }
 
-// ----------------------------
-// Create a checkbox and attach it to a DOM element
-// ----------------------------
 function createCheckbox(element, key) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -43,65 +31,25 @@ function createCheckbox(element, key) {
     element.appendChild(checkbox);
 }
 
-// ----------------------------
-// Determine page type from URL
-// ----------------------------
-function getPageType() {
-    const path = window.location.pathname; // e.g., /2, /juz/1, /page/23
-    const search = window.location.search; // e.g., ?startingVerse=5
-
-    if (path.startsWith("/juz/")) return 'juz';
-    if (path.startsWith("/page/")) return 'page';
-    if (search.includes("startingVerse")) return 'verse';
-    return 'surah'; // Default fallback
-}
-
-// ----------------------------
-// Generate unique storage key based on page type
-// ----------------------------
-function generateKey(pageType) {
-    const path = window.location.pathname;
-    const searchParams = new URLSearchParams(window.location.search);
-
-    switch (pageType) {
-        case 'surah':
-            const surahNumber = path.split('/')[1];
-            return `surah_${surahNumber}`;
-        case 'juz':
-            const juzNumber = path.split('/')[2];
-            return `juz_${juzNumber}`;
-        case 'page':
-            const pageNumber = path.split('/')[2];
-            return `page_${pageNumber}`;
-        case 'verse':
-            const surah = path.split('/')[1];
-            const verse = searchParams.get("startingVerse");
-            return `verse_${surah}_${verse}`;
-        default:
-            return 'unknown';
-    }
-}
-
-// ----------------------------
-// Initialize checkboxes for the page
-// ----------------------------
-// ...existing code...
-
 function initUI() {
-    // Only run on homepage
-    if (window.location.pathname !== "/") return;
-
-    // Select all Surah rows
+    // Remove homepage-only restriction to work on all pages
+    
+    // Select all Surah rows by their number div
     const surahRows = document.querySelectorAll('.SurahPreviewRow_surahNumber__uuxf9');
     surahRows.forEach((row) => {
-        const surahNumberSpan = row.querySelector('span');
-        if (!surahNumberSpan) return;
+        // Find the corresponding surah name div in the same row container
+        const surahContainer = row.closest('.SurahPreviewRow_left__TV2AO');
+        if (!surahContainer) return;
+        
+        const surahNameDiv = surahContainer.querySelector('.SurahPreviewRow_surahName__IHiSd');
+        if (!surahNameDiv) return;
 
-        const surahNumber = surahNumberSpan.innerText.trim();
-        const key = `surah_${surahNumber}`;
+        // Use the surah name as the storage key
+        const surahName = surahNameDiv.innerText.trim();
+        const key = `surah_${surahName}`; // e.g., "surah_Al-Fatihah"
 
         // Avoid adding multiple checkboxes
-        if (row.querySelector('input[type="checkbox"]')) return;
+        if (surahNameDiv.querySelector('input[type="checkbox"]')) return;
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -117,14 +65,35 @@ function initUI() {
             saveProgress(key, checkbox.checked);
         });
 
-        row.appendChild(checkbox);
+        surahNameDiv.appendChild(checkbox);
     });
 }
 
-// ...existing code...
+// Function to observe DOM changes
+function observePageChanges() {
+    // Target the main container where tab content changes occur
+    const targetNode = document.body;
+    
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            // Check if relevant elements were added or removed
+            if (mutation.type === 'childList' && 
+                (document.querySelector('.SurahPreviewRow_surahNumber__uuxf9'))) {
+                initUI();
+            }
+        });
+    });
 
+    // Start observing with specific configuration
+    observer.observe(targetNode, {
+        childList: true,    // Watch for changes in direct children
+        subtree: true,      // Watch for changes in all descendants
+        attributes: false    // Don't watch for attribute changes
+    });
+}
 
-// ----------------------------
-// Run
-// ----------------------------
-loadProgress(initUI);
+// Initialize when the page loads
+loadProgress(() => {
+    initUI();
+    observePageChanges();
+});
