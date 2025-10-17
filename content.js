@@ -14,67 +14,66 @@ function getCurrentView() {
 }
 
 function injectCheckboxes() {
-    const surahElement = document.querySelectorAll(".SurahPreviewRow_surahName__IHiSd");
-    if (surahElement.length === 0) {
+    const surahElements = document.querySelectorAll(".SurahPreviewRow_surahName__IHiSd");
+    if (surahElements.length === 0) {
         setTimeout(injectCheckboxes, 100); 
         return;
     }
-    else {
-        surahElement.forEach((element) => {
-            if (element.dataset.checkboxInjected) return;
 
-            const newCheckbox = document.createElement('input');
-            newCheckbox.type = 'checkbox';
-            newCheckbox.style.marginLeft = "8px";
-            newCheckbox.style.width = "16px";
-            newCheckbox.style.height = "16px";
-            const key = getSurahName(element);
-            newCheckbox.dataset.surahKey = key
+    surahElements.forEach((element) => {
+        if (element.dataset.checkboxInjected) return;
+
+        const newCheckbox = document.createElement('input');
+        newCheckbox.type = 'checkbox';
+        newCheckbox.style.marginLeft = "8px";
+        newCheckbox.style.width = "16px";
+        newCheckbox.style.height = "16px";
+
+        const key = getSurahName(element); // canonical surah name
+        newCheckbox.dataset.surahKey = key;
+
+        // Determine the current view
+        const currentView = getCurrentView();
+
+        // Determine which Juz this checkbox belongs to
+        let juz = "all"; // default for Surah/Revelation views
+        if (currentView === "juz") {
+            // Find the parent container that represents the Juz
+            const parentJuzContainer = element.closest(".JuzView_juzContainer__L8HsL"); // replace with actual class
+            if (parentJuzContainer) {
+                const juzText = parentJuzContainer.querySelector(".JuzView_juzTitle__DjSou span:last-child")?.textContent;
+                if (juzText) juz = juzText.trim();
+            }
+        }
+
+        // Restore checked state from storage
+        chrome.storage.local.get({ memorizedSurahs: {} }, (result) => {
+            const memorized = result.memorizedSurahs;
+            if (memorized[key]?.[juz]) {
+                newCheckbox.checked = true;
+            }
+        });
+
+        // Click listener
+        newCheckbox.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isChecked = newCheckbox.checked;
 
             chrome.storage.local.get({ memorizedSurahs: {} }, (result) => {
-                const memorized = result.memorizedSurahs;
-                if(memorized[key]) {
-                    newCheckbox.checked = true;
-                //        console.log(`✅ Restored: ${key} is marked memorized`);
-                } //else {
-                //    console.log(`⬜ Restored: ${key} is not memorized`);
-                //}
-            })
-            // chrome.storage.local.get(null, (result) => {
-            // console.log("Stored data:", result);
-            // });
-            newCheckbox.addEventListener('click', (event) => {
-                event.stopPropagation();
-                // TODO: store checked state
-                const isChecked = newCheckbox.checked;
-                
-                chrome.storage.local.get({ memorizedSurahs: {} }, (result) => {
-                    const updated = result.memorizedSurahs;
-                    updated[key] = isChecked;
-                    chrome.storage.local.set({ memorizedSurahs: updated }, () => {
-                        // console.log(isChecked
-                        //     ? `💾 Saved: ${key} = memorized`
-                        //     : `💾 Saved: ${key} = unmemorized`
-                        // );
-                    });
-                });
-                const currentView = getCurrentView();
+                const updated = result.memorizedSurahs;
 
-                if (currentView === 'juz') {
-                    // ✅ Only update this instance / Juz part in storage
-                    console.log("JUZ!!!!!!!!!!!!!!!");
-                } else {
-                    // ✅ Surah or Revelation view: mark all instances
-                    console.log("SURAH or REVELATION!!!!!!!!!!!!!!!");
-                }
+                if (!updated[key]) updated[key] = {};
+                updated[key][juz] = isChecked;
+
+                chrome.storage.local.set({ memorizedSurahs: updated });
             });
+        });
 
-            element.dataset.checkboxInjected = 'true';
-            element.appendChild(newCheckbox);
-
-        })
-    }
+        element.dataset.checkboxInjected = 'true';
+        element.appendChild(newCheckbox);
+    });
 }
+
 
 function homepageObserver() {
     const container = document.body;
