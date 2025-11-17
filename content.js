@@ -6,10 +6,12 @@ const JUZ_CONTAINER_SEL = ".JuzView_juzContainer__L8HsL";          // parent con
 const JUZ_TITLE_SEL = ".JuzView_juzTitle__DjSou span:last-child"; // selector to extract juz number
 const TAB_SELECTED_SEL = ".Tabs_tabItemSelected__YXy2p";
 
+// Gets surah name
 function getSurahKey(element) {
   return element.textContent.trim().toLowerCase();
 }
 
+// Gets current table view
 function getCurrentView() {
   const active = document.querySelector(TAB_SELECTED_SEL);
   if (!active) return "surah";
@@ -19,12 +21,26 @@ function getCurrentView() {
   return "surah";
 }
 
+// Gets Juz number for surah in juz view
 function getJuzForElement(element) {
-  const parent = element.closest(JUZ_CONTAINER_SEL);
+  // Find a stable container to search from
+  const row = element.closest(".SurahPreviewRow_container__Nx0i0") || element;
+
+  // Now find the actual Juz container
+  const parent = row.closest(".JuzView_juzContainer__L8HsL");
   if (!parent) return "all";
-  const txt = parent.querySelector(JUZ_TITLE_SEL)?.textContent;
-  return txt ? txt.trim() : "all";
+
+  // Extract the FIRST span under .JuzView_juzTitle
+  const titleSpan = parent.querySelector(".JuzView_juzTitle__DjSou span:first-child");
+  if (!titleSpan) return "all";
+
+  // Extract only digits (the juz number)
+  const match = titleSpan.textContent.match(/\d+/);
+  return match ? match[0] : "all";
 }
+
+
+
 
 // -----------------------------
 // Storage initialization helpers
@@ -84,6 +100,15 @@ function restoreStateAndAttach(element) {
 
   element.dataset.checkboxInjected = "true";
   element.appendChild(checkbox);
+
+  const key1 = getSurahKey(element);
+  const view1 = getCurrentView();
+  const juz1 = (view1 === "juz") ? getJuzForElement(element) : "all";
+  if (view1 === "juz") {
+    console.log("[DEBUG JUZ]", { surahKey: key1, juz1 });
+  }
+
+
 }
 
 function injectCheckboxesForView() {
@@ -112,8 +137,18 @@ function saveState(surahKey, juz, view, isChecked) {
       if (!memorizedJuz[surahKey]) memorizedJuz[surahKey] = {};
       memorizedJuz[surahKey][juz] = isChecked;
 
-      // recompute whether full surah is memorized (all juz parts true)
-      const parts = Object.values(memorizedJuz[surahKey]);
+      // 🧹 CLEAN UP LEGACY / INVALID JUZ KEYS
+      const cleaned = {};
+      for (const [k, v] of Object.entries(memorizedJuz[surahKey])) {
+        // keep only numeric juz keys like "1", "2", ... "30"
+        if (/^\d+$/.test(k)) {
+          cleaned[k] = v;
+        }
+      }
+      memorizedJuz[surahKey] = cleaned;
+
+      // recompute whether full surah is memorized (all valid juz parts true)
+      const parts = Object.values(cleaned);
       const fully = parts.length > 0 && parts.every(v => v === true);
       memorizedSurah[surahKey] = fully;
     } else {
